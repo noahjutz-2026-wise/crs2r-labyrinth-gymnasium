@@ -7,7 +7,9 @@ authors = [
     { name = "Noah Jutz", email = "git@noahjutz.anonaddy.com" }
 ]
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "gymnasium>=1.4.0",
+]
 
 [project.scripts]
 crs2r-labyrinth-gymnasium = "crs2r_labyrinth_gymnasium:main"
