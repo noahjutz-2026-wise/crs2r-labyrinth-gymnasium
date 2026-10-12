@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Noah Jutz", email = "git@noahjutz.anonaddy.com" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.10"
 dependencies = [
     "gymnasium>=1.4.0",
     "pyzmq>=27.2.0",
