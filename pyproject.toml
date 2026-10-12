@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.14"
 dependencies = [
     "gymnasium>=1.4.0",
+    "pyzmq>=27.2.0",
 ]
 
 [build-system]

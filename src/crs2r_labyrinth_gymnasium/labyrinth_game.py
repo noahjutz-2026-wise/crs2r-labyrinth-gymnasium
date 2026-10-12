@@ -1,10 +1,8 @@
-import pickle
-import socket
-import struct
 from typing import Any, SupportsFloat
 
 import gymnasium as gym
 import numpy as np
+import zmq
 from gymnasium.core import ActType, ObsType
 
 
@@ -25,44 +23,27 @@ class LabyrinthGame(gym.Env):
             }
         )
 
-        self.sock = socket.create_server((host, port))
-        self.conn, _ = self.sock.accept()
-
-    def _send(self, obj: Any) -> None:
-        payload = pickle.dumps(obj, protocol=4)
-        self.conn.sendall(struct.pack("!I", len(payload)) + payload)
-
-    def _receive(self) -> Any:
-        header = self._recv_exact(4)
-        (size,) = struct.unpack("!I", header)
-        return pickle.loads(self._recv_exact(size))
-
-    def _recv_exact(self, size: int) -> bytes:
-        chunks = bytearray()
-        while len(chunks) < size:
-            chunk = self.conn.recv(size - len(chunks))
-            if not chunk:
-                raise ConnectionError("Client disconnected")
-            chunks.extend(chunk)
-        return bytes(chunks)
+        self.context = zmq.Context()
+        self.socket = self.context.socket(zmq.REQ)
+        self.socket.bind(f"tcp://{host}:{port}")
 
     def step(
         self, action: ActType
     ) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
-        self._send(action)
-        return self._receive()
+        self.socket.send_pyobj(action)
+        return self.socket.recv_pyobj()
 
     def reset(
         self, *, seed: int | None = None, options: dict[str, Any] | None = None
     ) -> tuple[ObsType, dict[str, Any]]:
         super().reset(seed=seed)
-        self._send((seed, options))
-        return self._receive()
+        self.socket.send_pyobj((seed, options))
+        return self.socket.recv_pyobj()
 
     def close(self) -> None:
-        if self.conn is not None:
-            self.conn.close()
-            self.conn = None
-        if self.sock is not None:
-            self.sock.close()
-            self.sock = None
+        if getattr(self, "socket", None) is not None:
+            self.socket.close()
+            self.socket = None
+        if getattr(self, "context", None) is not None:
+            self.context.term()
+            self.context = None
