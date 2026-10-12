@@ -1,4 +1,6 @@
+import pickle
 import socket
+import struct
 from typing import Any, SupportsFloat
 
 import gymnasium as gym
@@ -26,18 +28,41 @@ class LabyrinthGame(gym.Env):
         self.sock = socket.create_server((host, port))
         self.conn, _ = self.sock.accept()
 
+    def _send(self, obj: Any) -> None:
+        payload = pickle.dumps(obj, protocol=4)
+        self.conn.sendall(struct.pack("!I", len(payload)) + payload)
+
+    def _receive(self) -> Any:
+        header = self._recv_exact(4)
+        (size,) = struct.unpack("!I", header)
+        return pickle.loads(self._recv_exact(size))
+
+    def _recv_exact(self, size: int) -> bytes:
+        chunks = bytearray()
+        while len(chunks) < size:
+            chunk = self.conn.recv(size - len(chunks))
+            if not chunk:
+                raise ConnectionError("Client disconnected")
+            chunks.extend(chunk)
+        return bytes(chunks)
+
     def step(
         self, action: ActType
     ) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
-        return super().step(action)
+        self._send(action)
+        return self._receive()
 
     def reset(
         self, *, seed: int | None = None, options: dict[str, Any] | None = None
     ) -> tuple[ObsType, dict[str, Any]]:
-        return super().reset(seed=seed, options=options)
+        super().reset(seed=seed)
+        self._send((seed, options))
+        return self._receive()
 
     def close(self) -> None:
-        if self.sock is not None:
-            self.sock.close()
         if self.conn is not None:
             self.conn.close()
+            self.conn = None
+        if self.sock is not None:
+            self.sock.close()
+            self.sock = None
